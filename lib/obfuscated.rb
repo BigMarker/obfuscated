@@ -18,11 +18,37 @@ module Obfuscated
     def find( *primary_key )
       # Sale.find( '7e2d2c4da1b0' )
       if primary_key.is_a?(String) && primary_key.length == 12
-        find_by_obfuscated_id( primary_key )
+        if column_names.include?('cached_obfuscated_id')
+          c = find_by_cached_obfuscated_id(primary_key)
+          if c
+             c
+          else
+            c = find_by_obfuscated_id(primary_key)
+            if c
+              c.update_column('cached_obfuscated_id', c.obfuscated_id)
+              c
+            end
+          end
+        else
+          find_by_obfuscated_id( primary_key)
+        end
 
       # Sale.includes(:store).find( '7e2d2c4da1b0' )
       elsif primary_key.is_a?(Array) && primary_key.length == 1 && primary_key[0].is_a?(String) && primary_key[0].length == 12
-        find_by_obfuscated_id( primary_key[0] )
+        if column_names.include?('cached_obfuscated_id')
+          c = find_by_cached_obfuscated_id(primary_key[0])
+          if c
+             c
+          else
+            c = find_by_obfuscated_id(primary_key[0])
+            if c
+              c.update_column('cached_obfuscated_id', c.obfuscated_id)
+              c
+            end
+          end
+        else
+          find_by_obfuscated_id( primary_key[0] )
+        end
 
       # Other queries
       else
