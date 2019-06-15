@@ -44,7 +44,7 @@ module Obfuscated
             if c
               c
             else
-              c = find_by_obfuscated_id_helper(hash,options)
+              c = find_by_obfuscated_id_helper(hash,options,true)
               if c
                 c.update_column('cached_obfuscated_id', c.obfuscated_id)
                  c
@@ -58,7 +58,7 @@ module Obfuscated
         end
         
         # Uses an 12 character string to find the appropriate record
-        def self.find_by_obfuscated_id_helper( hash, options={} )
+        def self.find_by_obfuscated_id_helper( hash, options={},search_null_cache_only = false )
           # Don't bother if there's no hash provided.
           return nil if hash.blank?
           
@@ -69,7 +69,11 @@ module Obfuscated
           options.update(:conditions => ["SUBSTRING(SHA1(CONCAT('---',#{self.table_name}.id,'-WICKED-#{self.table_name}-#{Obfuscated::obfuscated_salt}')),1,12) = ?", hash])
           
           # Find it!
-          first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.class.to_s} with Hashed ID=#{hash}"
+          if search_null_cache_only && column_names.include?('cached_obfuscated_id')
+            where('cached_obfuscated_id is null').first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.class.to_s} with Hashed ID=#{hash}"
+          else
+            first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.class.to_s} with Hashed ID=#{hash}"
+          end
         end
       end
     end
