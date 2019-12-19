@@ -15,14 +15,14 @@ module Obfuscated
   end
   
   module Finder
-    def find( *primary_key )
+    def find(*primary_key)
       # Sale.find( '7e2d2c4da1b0' )
       if primary_key.is_a?(String) && primary_key.length == 12
-        find_by_obfuscated_id( primary_key )
+        find_by_obfuscated_id(primary_key)
 
       # Sale.includes(:store).find( '7e2d2c4da1b0' )
       elsif primary_key.is_a?(Array) && primary_key.length == 1 && primary_key[0].is_a?(String) && primary_key[0].length == 12
-        find_by_obfuscated_id( primary_key[0] )
+        find_by_obfuscated_id(primary_key[0])
 
       # Other queries
       else
@@ -37,6 +37,7 @@ module Obfuscated
 
         include Obfuscated::InstanceMethods
 
+        after_commit :set_cached_obfuscated_id, on: :create
         
         def self.find_by_obfuscated_id( hash, options={} )
           if column_names.include?('cached_obfuscated_id')
@@ -44,21 +45,19 @@ module Obfuscated
             if c
               c
             else
-              c = find_by_obfuscated_id_helper(hash,options,true)
+              c = find_by_obfuscated_id_helper(hash, options, true)
               if c
                 c.update_column('cached_obfuscated_id', c.obfuscated_id)
-                 c
+                c
               end
             end
           else
-
-            find_by_obfuscated_id_helper(hash,options)
+            find_by_obfuscated_id_helper(hash, options)
           end
-
         end
         
-        # Uses an 12 character string to find the appropriate record
-        def self.find_by_obfuscated_id_helper( hash, options={},search_null_cache_only = false )
+        # Uses a 12 character string to find the appropriate record
+        def self.find_by_obfuscated_id_helper(hash, options={}, search_null_cache_only=false)
           # Don't bother if there's no hash provided.
           return nil if hash.blank?
           
@@ -70,9 +69,9 @@ module Obfuscated
           
           # Find it!
           if search_null_cache_only && column_names.include?('cached_obfuscated_id')
-            where('cached_obfuscated_id is null').first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.class.to_s} with Hashed ID=#{hash}"
+            where('cached_obfuscated_id is null').first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.name} with Hashed ID=#{hash}"
           else
-            first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.class.to_s} with Hashed ID=#{hash}"
+            first(options) or raise ActiveRecord::RecordNotFound, "Couldn't find #{self.name} with Hashed ID=#{hash}"
           end
         end
       end
@@ -94,10 +93,22 @@ module Obfuscated
       )[0..11]  
     end
 
-    #def to_param
-      #obfuscated_id
-    #end
+    def set_cached_obfuscated_id
+      return unless self.class.column_names.include? "cached_obfuscated_id"
+      if self.cached_obfuscated_id.nil? || self.obfuscated_id != self.cached_obfuscated_id
+        self.update_column('cached_obfuscated_id', self.obfuscated_id)
+      end
+    end
+
+    def dup
+      # Avoid copying memory-cached obfuscated id to new object
+      duped = super
+      duped.instance_variable_set(:@obfuscated_id, nil)
+      duped.cached_obfuscated_id = nil if self.respond_to? :"cached_obfuscated_id="
+      duped
+    end
   end
+
 end
 
 ActiveRecord::Base.class_eval { include Obfuscated }
